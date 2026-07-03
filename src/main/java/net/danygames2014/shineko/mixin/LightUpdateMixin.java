@@ -38,10 +38,20 @@ public class LightUpdateMixin {
     @Final
     public LightType lightType;
 
-    @Unique
-    private static final ThreadLocal<int[]> QUEUE_CACHE = ThreadLocal.withInitial(() -> new int[65536]);
-    @Unique
-    private static final ThreadLocal<int[]> REMOVE_QUEUE_CACHE = ThreadLocal.withInitial(() -> new int[65536]);
+    @Unique 
+    private static final ThreadLocal<int[]> QUEUE_X = ThreadLocal.withInitial(() -> new int[65536]);
+    @Unique 
+    private static final ThreadLocal<int[]> QUEUE_Y = ThreadLocal.withInitial(() -> new int[65536]);
+    @Unique 
+    private static final ThreadLocal<int[]> QUEUE_Z = ThreadLocal.withInitial(() -> new int[65536]);
+    
+    @Unique 
+    private static final ThreadLocal<int[]> REMOVE_QUEUE_X = ThreadLocal.withInitial(() -> new int[65536]);
+    @Unique 
+    private static final ThreadLocal<int[]> REMOVE_QUEUE_Y = ThreadLocal.withInitial(() -> new int[65536]);
+    @Unique 
+    private static final ThreadLocal<int[]> REMOVE_QUEUE_Z = ThreadLocal.withInitial(() -> new int[65536]);
+    
     @Unique
     private static final ThreadLocal<int[]> REMOVE_VAL_CACHE = ThreadLocal.withInitial(() -> new int[65536]);
 
@@ -69,13 +79,17 @@ public class LightUpdateMixin {
         int pMinZ = this.minZ - 15;
         int pMaxZ = this.maxZ + 15;
 
-        int[] queue = QUEUE_CACHE.get();
-        int[] removeQueue = REMOVE_QUEUE_CACHE.get();
+        int[] queueX = QUEUE_X.get();
+        int[] queueY = QUEUE_Y.get();
+        int[] queueZ = QUEUE_Z.get();
+        int[] removeX = REMOVE_QUEUE_X.get();
+        int[] removeY = REMOVE_QUEUE_Y.get();
+        int[] removeZ = REMOVE_QUEUE_Z.get();
         int[] removeVal = REMOVE_VAL_CACHE.get();
 
         int head = 0; int tail = 0;
         int rHead = 0; int rTail = 0;
-        int maxCapacity = queue.length;
+        int maxCapacity = queueX.length;
 
         // 1. Seed Stage
         Long2BooleanOpenHashMap visitedChunks = VISITED_CHUNKS.get();
@@ -113,12 +127,11 @@ public class LightUpdateMixin {
                     int targetLight = calculateTargetLight(world, x, y, z);
 
                     if (currentLight != targetLight) {
-                        // Bit-pack coordinates relative to pMinX and pMinZ
-                        int packedPos = ((x - pMinX) << 14) | (y << 6) | (z - pMinZ);
-
                         if (targetLight < currentLight) {
                             if (rTail < maxCapacity) {
-                                removeQueue[rTail] = packedPos;
+                                removeX[rTail] = x;
+                                removeY[rTail] = y;
+                                removeZ[rTail] = z;
                                 removeVal[rTail] = currentLight;
                                 rTail++;
                             }
@@ -126,7 +139,10 @@ public class LightUpdateMixin {
                         } else {
                             world.setLight(this.lightType, x, y, z, targetLight);
                             if (tail < maxCapacity) {
-                                queue[tail++] = packedPos;
+                                queueX[tail] = x;
+                                queueY[tail] = y;
+                                queueZ[tail] = z;
+                                tail++;
                             }
                         }
                     }
@@ -136,13 +152,10 @@ public class LightUpdateMixin {
 
         // 2. Depropagation Stage
         while (rHead < rTail) {
-            int packed = removeQueue[rHead];
+            int cx = removeX[rHead];
+            int cy = removeY[rHead];
+            int cz = removeZ[rHead];
             int oldVal = removeVal[rHead++];
-
-            // Unpack coordinates
-            int cx = pMinX + (packed >> 14);
-            int cy = (packed >> 6) & 0xFF;
-            int cz = pMinZ + (packed & 0x3F);
 
             for (int i = 0; i < 6; i++) {
                 int nx = cx + DX[i];
@@ -155,18 +168,21 @@ public class LightUpdateMixin {
                 int opacity = Block.BLOCKS_LIGHT_OPACITY[world.getBlockId(nx, ny, nz)];
                 if (opacity <= 0) opacity = 1;
 
-                int nPacked = ((nx - pMinX) << 14) | (ny << 6) | (nz - pMinZ);
-
                 if (neighborLight != 0 && neighborLight == oldVal - opacity) {
                     if (rTail < maxCapacity) {
-                        removeQueue[rTail] = nPacked;
+                        removeX[rTail] = nx;
+                        removeY[rTail] = ny;
+                        removeZ[rTail] = nz;
                         removeVal[rTail] = neighborLight;
                         rTail++;
                     }
                     world.setLight(this.lightType, nx, ny, nz, 0);
                 } else if (neighborLight >= oldVal) {
                     if (tail < maxCapacity) {
-                        queue[tail++] = nPacked;
+                        queueX[tail] = nx;
+                        queueY[tail] = ny;
+                        queueZ[tail] = nz;
+                        tail++;
                     }
                 }
             }
@@ -174,10 +190,10 @@ public class LightUpdateMixin {
 
         // 3. Propagation Stage
         while (head < tail) {
-            int packed = queue[head++];
-            int cx = pMinX + (packed >> 14);
-            int cy = (packed >> 6) & 0xFF;
-            int cz = pMinZ + (packed & 0x3F);
+            int cx = queueX[head];
+            int cy = queueY[head];
+            int cz = queueZ[head];
+            head++;
 
             int currentLight = world.getBrightness(this.lightType, cx, cy, cz);
 
@@ -195,8 +211,10 @@ public class LightUpdateMixin {
                 if (neighborLight < currentLight - opacity) {
                     world.setLight(this.lightType, nx, ny, nz, currentLight - opacity);
                     if (tail < maxCapacity) {
-                        int nPacked = ((nx - pMinX) << 14) | (ny << 6) | (nz - pMinZ);
-                        queue[tail++] = nPacked;
+                        queueX[tail] = nx;
+                        queueY[tail] = ny;
+                        queueZ[tail] = nz;
+                        tail++;
                     }
                 }
             }
