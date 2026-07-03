@@ -1,8 +1,6 @@
 package net.danygames2014.shineko.mixin;
 
 import it.unimi.dsi.fastutil.longs.Long2BooleanOpenHashMap;
-import net.danygames2014.shineko.LightWrite;
-import net.danygames2014.shineko.mixininterface.ShinekoWorld;
 import net.minecraft.block.Block;
 import net.minecraft.world.LightType;
 import net.minecraft.world.World;
@@ -15,8 +13,6 @@ import org.spongepowered.asm.mixin.Unique;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
-
-import java.util.concurrent.LinkedTransferQueue;
 
 @Mixin(LightUpdate.class)
 public class LightUpdateMixin {
@@ -99,8 +95,6 @@ public class LightUpdateMixin {
         Long2BooleanOpenHashMap visitedChunks = VISITED_CHUNKS.get();
         visitedChunks.clear();
 
-        LinkedTransferQueue<LightWrite> completedQueue = ((ShinekoWorld)world).shineko$getCompletedWritesQueue();
-        
         for (int x = this.minX; x <= this.maxX; ++x) {
             int chunkX = x >> 4;
             for (int z = this.minZ; z <= this.maxZ; ++z) {
@@ -142,11 +136,9 @@ public class LightUpdateMixin {
                                 removeVal[rTail] = currentLight;
                                 rTail++;
                             }
-                            //world.setLight(this.lightType, x, y, z, 0);
-                            completedQueue.offer(new LightWrite(this.lightType, x, y, z, 0));
+                            world.setLight(this.lightType, x, y, z, 0);
                         } else {
-                            //world.setLight(this.lightType, x, y, z, targetLight);
-                            completedQueue.offer(new LightWrite(this.lightType, x, y, z, targetLight));
+                            world.setLight(this.lightType, x, y, z, targetLight);
                             if (tail < maxCapacity) {
                                 queueX[tail] = x;
                                 queueY[tail] = y;
@@ -173,6 +165,8 @@ public class LightUpdateMixin {
 
                 if (nx < pMinX || nx > pMaxX || nz < pMinZ || nz > pMaxZ || ny < bottomY || ny > topY) continue;
 
+                if (!world.hasChunk(nx >> 4, nz >> 4)) continue;
+
                 int neighborLight = world.getBrightness(this.lightType, nx, ny, nz);
                 int opacity = Block.BLOCKS_LIGHT_OPACITY[world.getBlockId(nx, ny, nz)];
                 if (opacity <= 0) opacity = 1;
@@ -185,8 +179,7 @@ public class LightUpdateMixin {
                         removeVal[rTail] = neighborLight;
                         rTail++;
                     }
-                    //world.setLight(this.lightType, nx, ny, nz, 0);
-                    completedQueue.offer(new LightWrite(this.lightType, nx, ny, nz, 0));
+                    world.setLight(this.lightType, nx, ny, nz, 0);
                 } else if (neighborLight >= oldVal) {
                     if (tail < maxCapacity) {
                         queueX[tail] = nx;
@@ -214,13 +207,14 @@ public class LightUpdateMixin {
 
                 if (nx < pMinX || nx > pMaxX || nz < pMinZ || nz > pMaxZ || ny < bottomY || ny > topY) continue;
 
+                if (!world.hasChunk(nx >> 4, nz >> 4)) continue;
+                
                 int neighborLight = world.getBrightness(this.lightType, nx, ny, nz);
                 int opacity = Block.BLOCKS_LIGHT_OPACITY[world.getBlockId(nx, ny, nz)];
                 if (opacity <= 0) opacity = 1;
 
                 if (neighborLight < currentLight - opacity) {
-                    //world.setLight(this.lightType, nx, ny, nz, currentLight - opacity);
-                    completedQueue.offer(new LightWrite(this.lightType, nx, ny, nz, currentLight - opacity));
+                    world.setLight(this.lightType, nx, ny, nz, currentLight - opacity);
                     if (tail < maxCapacity) {
                         queueX[tail] = nx;
                         queueY[tail] = ny;
@@ -232,7 +226,7 @@ public class LightUpdateMixin {
         }
 
         long endTime = System.nanoTime();
-        System.out.println("Light update took " + (endTime - startTime) / 1000 + "us on thread " + Thread.currentThread().getName());
+        //System.out.println("Light update took " + (endTime - startTime) / 1000 + "us on thread " + Thread.currentThread().getName());
         
         ci.cancel();
     }
@@ -251,22 +245,26 @@ public class LightUpdateMixin {
         if (this.lightType == LightType.SKY && baseLight == 15) return 15;
         if (opacity >= 15 && baseLight == 0) return 0;
 
-        int maxNeighbor = world.getBrightness(this.lightType, x - 1, y, z);
-        
-        int next = world.getBrightness(this.lightType, x + 1, y, z);
-        if (next > maxNeighbor) maxNeighbor = next;
+        int maxNeighbor = 0;
+        int bottomY = world.getBottomY();
+        int topY = world.getTopY();
 
-        next = world.getBrightness(this.lightType, x, y - 1, z);
-        if (next > maxNeighbor) maxNeighbor = next;
+        for (int i = 0; i < 6; i++) {
+            int nx = x + DX[i];
+            int ny = y + DY[i];
+            int nz = z + DZ[i];
 
-        next = world.getBrightness(this.lightType, x, y + 1, z);
-        if (next > maxNeighbor) maxNeighbor = next;
+            // Guard against vertical world boundaries
+            if (ny < bottomY || ny >= topY) continue;
 
-        next = world.getBrightness(this.lightType, x, y, z - 1);
-        if (next > maxNeighbor) maxNeighbor = next;
+            // Guard against doing lighting in chunks that don't exist
+            if (!world.hasChunk(nx >> 4, nz >> 4)) continue;
 
-        next = world.getBrightness(this.lightType, x, y, z + 1);
-        if (next > maxNeighbor) maxNeighbor = next;
+            int neighborLight = world.getBrightness(this.lightType, nx, ny, nz);
+            if (neighborLight > maxNeighbor) {
+                maxNeighbor = neighborLight;
+            }
+        }
 
         return Math.max(baseLight, Math.max(0, maxNeighbor - opacity));
     }

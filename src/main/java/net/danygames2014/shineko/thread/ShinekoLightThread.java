@@ -1,6 +1,7 @@
 package net.danygames2014.shineko.thread;
 
 import net.danygames2014.shineko.Shineko;
+import net.danygames2014.shineko.mixin.LightUpdateMixin;
 import net.danygames2014.shineko.mixininterface.ShinekoWorld;
 import net.minecraft.world.World;
 import net.minecraft.world.chunk.light.LightUpdate;

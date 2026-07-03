@@ -1,6 +1,5 @@
 package net.danygames2014.shineko.mixin;
 
-import net.danygames2014.shineko.LightWrite;
 import net.danygames2014.shineko.Shineko;
 import net.danygames2014.shineko.thread.ShinekoLightThread;
 import net.danygames2014.shineko.mixininterface.ShinekoWorld;
@@ -54,12 +53,9 @@ public abstract class WorldMixin implements ShinekoWorld {
     
     @Unique private int recentIdx = 0;
 
-    // Light thread and communication with it
+    // Light Thread 
     @Unique
     ShinekoLightThread lightThread;
-    
-    @Unique
-    LinkedTransferQueue<LightWrite> lightWrites = new LinkedTransferQueue<>();
     
     @Inject(method = "<init>(Lnet/minecraft/world/storage/WorldStorage;Ljava/lang/String;JLnet/minecraft/world/dimension/Dimension;)V", at = @At("TAIL"))
     public void initLightThread(WorldStorage storage, String name, long seed, Dimension dimension, CallbackInfo ci) {
@@ -72,20 +68,8 @@ public abstract class WorldMixin implements ShinekoWorld {
         return lightUpdates;
     }
 
-    @Override
-    public LinkedTransferQueue<LightWrite> shineko$getCompletedWritesQueue() {
-        return lightWrites;
-    }
-
     @Inject(method = "doLightingUpdates", at = @At(value = "HEAD"), cancellable = true)
     public void cancelVanillaLightUpdateProcessing(CallbackInfoReturnable<Boolean> cir) {
-        System.err.println("Processing " + lightWrites.size() + " light writes");
-        
-        LightWrite write;
-        while ((write = lightWrites.poll()) != null) {
-            this.setLight(write.type(), write.x(), write.y(), write.z(), write.val());
-        }
-        
         if (!this.lightingQueue.isEmpty()) {
             Shineko.LOGGER.warn("Lighting queue is not empty! This is a bug!");
         }
