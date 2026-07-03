@@ -1,5 +1,6 @@
 package net.danygames2014.shineko.mixin;
 
+import it.unimi.dsi.fastutil.longs.Long2BooleanOpenHashMap;
 import net.minecraft.block.Block;
 import net.minecraft.world.LightType;
 import net.minecraft.world.World;
@@ -44,17 +45,30 @@ public class LightUpdateMixin {
     @Unique
     private static final ThreadLocal<int[]> REMOVE_VAL_CACHE = ThreadLocal.withInitial(() -> new int[65536]);
 
+    @Unique
+    private final ThreadLocal<Long2BooleanOpenHashMap> VISITED_CHUNKS = ThreadLocal.withInitial(Long2BooleanOpenHashMap::new);
+    
+    @Unique
+    private static final int[] DX = {-1, 1, 0, 0, 0, 0};
+    @Unique
+    private static final int[] DY = {0, 0, -1, 1, 0, 0};
+    @Unique
+    private static final int[] DZ = {0, 0, 0, 0, -1, 1};
+    
     @Inject(method = "updateLight", at = @At(value = "HEAD"), cancellable = true)
     public void smileyFace(World world, CallbackInfo ci) {
-        if (this.minY < world.getBottomY()) this.minY = world.getBottomY();
-        if (this.maxY >= world.getTopY()) this.maxY = world.getTopY();
+        long startTime = System.nanoTime();
+        
+        int bottomY = world.getBottomY();
+        int topY = world.getTopY();
+        if (this.minY < bottomY) this.minY = bottomY;
+        if (this.maxY >= topY) this.maxY = topY;
 
         int pMinX = this.minX - 15;
         int pMaxX = this.maxX + 15;
         int pMinZ = this.minZ - 15;
         int pMaxZ = this.maxZ + 15;
 
-        // Fetch our pre-allocated reusable arrays from cache (Instant, 0ns overhead)
         int[] queue = QUEUE_CACHE.get();
         int[] removeQueue = REMOVE_QUEUE_CACHE.get();
         int[] removeVal = REMOVE_VAL_CACHE.get();
@@ -64,14 +78,36 @@ public class LightUpdateMixin {
         int maxCapacity = queue.length;
 
         // 1. Seed Stage
+        Long2BooleanOpenHashMap visitedChunks = VISITED_CHUNKS.get();
+        visitedChunks.clear();
+        
         for (int x = this.minX; x <= this.maxX; ++x) {
             for (int z = this.minZ; z <= this.maxZ; ++z) {
-                if (!world.isRegionLoaded(x, 0, z, 1)) continue;
+                int chunkX = x >> 4;
+                int chunkZ = z >> 4;
+                long chunkKey = ((long) chunkX << 32) | chunkZ;
 
-                // Micro-optimization: Cache the active chunk column lookup
-                Chunk chunk = world.getChunk(x >> 4, z >> 4);
-                if (chunk == null || chunk.isEmpty()) continue;
+                // Check if we already checked the validity of this chunk
+                boolean isChunkValid;
+                if (visitedChunks.containsKey(chunkKey)) {
+                    // Already checked
+                    isChunkValid = visitedChunks.get(chunkKey);
+                } else {
+                    // Not checked yet
+                    if (!world.isRegionLoaded(x, 0, z, 1)) {
+                        isChunkValid = false;
+                    } else {
+                        Chunk chunk = world.getChunk(chunkX, chunkZ);
+                        isChunkValid = (chunk != null && !chunk.isEmpty());
+                    }
+                    visitedChunks.put(chunkKey, isChunkValid);
+                }
 
+                // If the chunk is not valid, skip it
+                if (!isChunkValid) {
+                    continue;
+                }
+                
                 for (int y = this.minY; y <= this.maxY; ++y) {
                     int currentLight = world.getBrightness(this.lightType, x, y, z);
                     int targetLight = calculateTargetLight(world, x, y, z);
@@ -98,10 +134,6 @@ public class LightUpdateMixin {
             }
         }
 
-        int[] dx = {-1, 1, 0, 0, 0, 0};
-        int[] dy = {0, 0, -1, 1, 0, 0};
-        int[] dz = {0, 0, 0, 0, -1, 1};
-
         // 2. Depropagation Stage
         while (rHead < rTail) {
             int packed = removeQueue[rHead];
@@ -113,11 +145,11 @@ public class LightUpdateMixin {
             int cz = pMinZ + (packed & 0x3F);
 
             for (int i = 0; i < 6; i++) {
-                int nx = cx + dx[i];
-                int ny = cy + dy[i];
-                int nz = cz + dz[i];
+                int nx = cx + DX[i];
+                int ny = cy + DY[i];
+                int nz = cz + DZ[i];
 
-                if (nx < pMinX || nx > pMaxX || nz < pMinZ || nz > pMaxZ || ny < 0 || ny > 127) continue;
+                if (nx < pMinX || nx > pMaxX || nz < pMinZ || nz > pMaxZ || ny < bottomY || ny > topY) continue;
 
                 int neighborLight = world.getBrightness(this.lightType, nx, ny, nz);
                 int opacity = Block.BLOCKS_LIGHT_OPACITY[world.getBlockId(nx, ny, nz)];
@@ -150,11 +182,11 @@ public class LightUpdateMixin {
             int currentLight = world.getBrightness(this.lightType, cx, cy, cz);
 
             for (int i = 0; i < 6; i++) {
-                int nx = cx + dx[i];
-                int ny = cy + dy[i];
-                int nz = cz + dz[i];
+                int nx = cx + DX[i];
+                int ny = cy + DY[i];
+                int nz = cz + DZ[i];
 
-                if (nx < pMinX || nx > pMaxX || nz < pMinZ || nz > pMaxZ || ny < 0 || ny > 127) continue;
+                if (nx < pMinX || nx > pMaxX || nz < pMinZ || nz > pMaxZ || ny < bottomY || ny > topY) continue;
 
                 int neighborLight = world.getBrightness(this.lightType, nx, ny, nz);
                 int opacity = Block.BLOCKS_LIGHT_OPACITY[world.getBlockId(nx, ny, nz)];
@@ -169,24 +201,25 @@ public class LightUpdateMixin {
                 }
             }
         }
+
+        long endTime = System.nanoTime();
+        System.out.println("Light update took " + (endTime - startTime) / 1000 + "us");
         
         ci.cancel();
     }
 
-    // Helper method to look up expected lighting based on rules
     @Unique
     private int calculateTargetLight(World world, int x, int y, int z) {
         int blockId = world.getBlockId(x, y, z);
         int opacity = Block.BLOCKS_LIGHT_OPACITY[blockId];
         if (opacity <= 0) opacity = 1;
 
-        int baseLight = 0;
-        if (this.lightType == LightType.SKY) {
-            if (world.isTopY(x, y, z)) return 15;
-        } else {
-            baseLight = Block.BLOCKS_LIGHT_LUMINANCE[blockId];
-        }
+        int baseLight = switch (this.lightType) {
+            case SKY -> world.isTopY(x, y, z) ? 15 : 0;
+            case BLOCK -> Block.BLOCKS_LIGHT_LUMINANCE[blockId];
+        };
 
+        if (this.lightType == LightType.SKY && baseLight == 15) return 15;
         if (opacity >= 15 && baseLight == 0) return 0;
 
         int maxNeighbor = 0;
