@@ -1,6 +1,8 @@
 package net.danygames2014.shineko.mixin;
 
 import it.unimi.dsi.fastutil.longs.Long2BooleanOpenHashMap;
+import net.danygames2014.shineko.LightWrite;
+import net.danygames2014.shineko.mixininterface.ShinekoWorld;
 import net.minecraft.block.Block;
 import net.minecraft.world.LightType;
 import net.minecraft.world.World;
@@ -13,6 +15,8 @@ import org.spongepowered.asm.mixin.Unique;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
+
+import java.util.concurrent.LinkedTransferQueue;
 
 @Mixin(LightUpdate.class)
 public class LightUpdateMixin {
@@ -94,6 +98,8 @@ public class LightUpdateMixin {
         // 1. Seed Stage
         Long2BooleanOpenHashMap visitedChunks = VISITED_CHUNKS.get();
         visitedChunks.clear();
+
+        LinkedTransferQueue<LightWrite> completedQueue = ((ShinekoWorld)world).shineko$getCompletedWritesQueue();
         
         for (int x = this.minX; x <= this.maxX; ++x) {
             int chunkX = x >> 4;
@@ -108,12 +114,13 @@ public class LightUpdateMixin {
                     isChunkValid = visitedChunks.get(chunkKey);
                 } else {
                     // Not checked yet
-                    if (!world.isRegionLoaded(x, 0, z, 1)) {
-                        isChunkValid = false;
-                    } else {
+                    if (world.hasChunk(chunkX, chunkZ)) {
                         Chunk chunk = world.getChunk(chunkX, chunkZ);
                         isChunkValid = (chunk != null && !chunk.isEmpty());
+                    } else {
+                        isChunkValid = false;
                     }
+                    
                     visitedChunks.put(chunkKey, isChunkValid);
                 }
 
@@ -135,9 +142,11 @@ public class LightUpdateMixin {
                                 removeVal[rTail] = currentLight;
                                 rTail++;
                             }
-                            world.setLight(this.lightType, x, y, z, 0);
+                            //world.setLight(this.lightType, x, y, z, 0);
+                            completedQueue.offer(new LightWrite(this.lightType, x, y, z, 0));
                         } else {
-                            world.setLight(this.lightType, x, y, z, targetLight);
+                            //world.setLight(this.lightType, x, y, z, targetLight);
+                            completedQueue.offer(new LightWrite(this.lightType, x, y, z, targetLight));
                             if (tail < maxCapacity) {
                                 queueX[tail] = x;
                                 queueY[tail] = y;
@@ -176,7 +185,8 @@ public class LightUpdateMixin {
                         removeVal[rTail] = neighborLight;
                         rTail++;
                     }
-                    world.setLight(this.lightType, nx, ny, nz, 0);
+                    //world.setLight(this.lightType, nx, ny, nz, 0);
+                    completedQueue.offer(new LightWrite(this.lightType, nx, ny, nz, 0));
                 } else if (neighborLight >= oldVal) {
                     if (tail < maxCapacity) {
                         queueX[tail] = nx;
@@ -209,7 +219,8 @@ public class LightUpdateMixin {
                 if (opacity <= 0) opacity = 1;
 
                 if (neighborLight < currentLight - opacity) {
-                    world.setLight(this.lightType, nx, ny, nz, currentLight - opacity);
+                    //world.setLight(this.lightType, nx, ny, nz, currentLight - opacity);
+                    completedQueue.offer(new LightWrite(this.lightType, nx, ny, nz, currentLight - opacity));
                     if (tail < maxCapacity) {
                         queueX[tail] = nx;
                         queueY[tail] = ny;
@@ -221,7 +232,7 @@ public class LightUpdateMixin {
         }
 
         long endTime = System.nanoTime();
-        System.out.println("Light update took " + (endTime - startTime) / 1000 + "us");
+        System.out.println("Light update took " + (endTime - startTime) / 1000 + "us on thread " + Thread.currentThread().getName());
         
         ci.cancel();
     }

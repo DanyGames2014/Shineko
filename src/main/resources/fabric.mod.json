@@ -15,12 +15,14 @@
   "environment": "*",
   "entrypoints": {
     "stationapi:event_bus": [
+      "net.danygames2014.shineko.Shineko"
     ],
     "stationapi:event_bus_client": [
     ],
     "stationapi:event_bus_server": [
     ]
   },
+  "accessWidener": "shineko.accesswidener",
   "mixins": [
     "shineko.mixins.json"
   ],
