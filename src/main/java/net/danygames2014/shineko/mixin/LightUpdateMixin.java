@@ -72,7 +72,7 @@ public class LightUpdateMixin {
         int bottomY = world.getBottomY();
         int topY = world.getTopY();
         if (this.minY < bottomY) this.minY = bottomY;
-        if (this.maxY >= topY) this.maxY = topY;
+        if (this.maxY >= topY) this.maxY = topY - 1;
 
         int pMinX = this.minX - 15;
         int pMaxX = this.maxX + 15;
@@ -96,10 +96,10 @@ public class LightUpdateMixin {
         visitedChunks.clear();
         
         for (int x = this.minX; x <= this.maxX; ++x) {
+            int chunkX = x >> 4;
             for (int z = this.minZ; z <= this.maxZ; ++z) {
-                int chunkX = x >> 4;
                 int chunkZ = z >> 4;
-                long chunkKey = ((long) chunkX << 32) | chunkZ;
+                long chunkKey = ((long) chunkX << 32) | (chunkZ & 0xFFFFFFFFL);
 
                 // Check if we already checked the validity of this chunk
                 boolean isChunkValid;
@@ -240,13 +240,22 @@ public class LightUpdateMixin {
         if (this.lightType == LightType.SKY && baseLight == 15) return 15;
         if (opacity >= 15 && baseLight == 0) return 0;
 
-        int maxNeighbor = 0;
-        maxNeighbor = Math.max(maxNeighbor, world.getBrightness(this.lightType, x - 1, y, z));
-        maxNeighbor = Math.max(maxNeighbor, world.getBrightness(this.lightType, x + 1, y, z));
-        maxNeighbor = Math.max(maxNeighbor, world.getBrightness(this.lightType, x, y - 1, z));
-        maxNeighbor = Math.max(maxNeighbor, world.getBrightness(this.lightType, x, y + 1, z));
-        maxNeighbor = Math.max(maxNeighbor, world.getBrightness(this.lightType, x, y, z - 1));
-        maxNeighbor = Math.max(maxNeighbor, world.getBrightness(this.lightType, x, y, z + 1));
+        int maxNeighbor = world.getBrightness(this.lightType, x - 1, y, z);
+        
+        int next = world.getBrightness(this.lightType, x + 1, y, z);
+        if (next > maxNeighbor) maxNeighbor = next;
+
+        next = world.getBrightness(this.lightType, x, y - 1, z);
+        if (next > maxNeighbor) maxNeighbor = next;
+
+        next = world.getBrightness(this.lightType, x, y + 1, z);
+        if (next > maxNeighbor) maxNeighbor = next;
+
+        next = world.getBrightness(this.lightType, x, y, z - 1);
+        if (next > maxNeighbor) maxNeighbor = next;
+
+        next = world.getBrightness(this.lightType, x, y, z + 1);
+        if (next > maxNeighbor) maxNeighbor = next;
 
         return Math.max(baseLight, Math.max(0, maxNeighbor - opacity));
     }
