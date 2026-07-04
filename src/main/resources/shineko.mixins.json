@@ -4,6 +4,7 @@
   "package": "net.danygames2014.shineko.mixin",
   "compatibilityLevel": "JAVA_17",
   "mixins": [
+    "ChunkMixin",
     "LightUpdateMixin",
     "WorldMixin",
     "test.ChunkCacheMixin"
