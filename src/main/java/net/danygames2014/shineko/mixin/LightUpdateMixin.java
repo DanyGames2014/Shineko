@@ -1,6 +1,7 @@
 package net.danygames2014.shineko.mixin;
 
 import it.unimi.dsi.fastutil.longs.Long2BooleanOpenHashMap;
+import net.danygames2014.shineko.Shineko;
 import net.minecraft.block.Block;
 import net.minecraft.world.LightType;
 import net.minecraft.world.World;
@@ -45,24 +46,24 @@ public class LightUpdateMixin {
     private static final int[] DZ = {0, 0, 0, 0, -1, 1};
     
     @Unique 
-    private static final ThreadLocal<int[]> QUEUE_X = ThreadLocal.withInitial(() -> new int[65536]);
+    private static final ThreadLocal<int[]> QUEUE_X = ThreadLocal.withInitial(() -> new int[Shineko.CONFIG.lightUpdateQueueSize]);
     @Unique 
-    private static final ThreadLocal<int[]> QUEUE_Y = ThreadLocal.withInitial(() -> new int[65536]);
+    private static final ThreadLocal<int[]> QUEUE_Y = ThreadLocal.withInitial(() -> new int[Shineko.CONFIG.lightUpdateQueueSize]);
     @Unique 
-    private static final ThreadLocal<int[]> QUEUE_Z = ThreadLocal.withInitial(() -> new int[65536]);
+    private static final ThreadLocal<int[]> QUEUE_Z = ThreadLocal.withInitial(() -> new int[Shineko.CONFIG.lightUpdateQueueSize]);
     
     @Unique 
-    private static final ThreadLocal<int[]> REMOVE_QUEUE_X = ThreadLocal.withInitial(() -> new int[65536]);
+    private static final ThreadLocal<int[]> REMOVE_QUEUE_X = ThreadLocal.withInitial(() -> new int[Shineko.CONFIG.lightUpdateQueueSize]);
     @Unique 
-    private static final ThreadLocal<int[]> REMOVE_QUEUE_Y = ThreadLocal.withInitial(() -> new int[65536]);
+    private static final ThreadLocal<int[]> REMOVE_QUEUE_Y = ThreadLocal.withInitial(() -> new int[Shineko.CONFIG.lightUpdateQueueSize]);
     @Unique 
-    private static final ThreadLocal<int[]> REMOVE_QUEUE_Z = ThreadLocal.withInitial(() -> new int[65536]);
+    private static final ThreadLocal<int[]> REMOVE_QUEUE_Z = ThreadLocal.withInitial(() -> new int[Shineko.CONFIG.lightUpdateQueueSize]);
     
     @Unique
-    private static final ThreadLocal<int[]> REMOVE_VAL_CACHE = ThreadLocal.withInitial(() -> new int[65536]);
+    private static final ThreadLocal<int[]> REMOVE_VAL_CACHE = ThreadLocal.withInitial(() -> new int[Shineko.CONFIG.lightUpdateQueueSize]);
 
     @Unique
-    private final ThreadLocal<Long2BooleanOpenHashMap> VISITED_CHUNKS = ThreadLocal.withInitial(Long2BooleanOpenHashMap::new);
+    private final ThreadLocal<Long2BooleanOpenHashMap> VISITED_CHUNKS = ThreadLocal.withInitial(() -> new Long2BooleanOpenHashMap(512, 0.5f));
     
     @Inject(method = "updateLight", at = @At(value = "HEAD"), cancellable = true)
     public void smileyFace(World world, CallbackInfo ci) {

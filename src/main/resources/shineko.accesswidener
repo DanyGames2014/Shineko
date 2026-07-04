@@ -1,3 +1,4 @@
 classTweaker v2 named
 
 accessible method net/minecraft/world/World hasChunk (II)Z
+accessible field net/minecraft/world/World chunkSource Lnet/minecraft/world/chunk/ChunkSource;
