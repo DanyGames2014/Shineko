@@ -1,6 +1,6 @@
 package net.danygames2014.shineko.mixin;
 
-import it.unimi.dsi.fastutil.longs.Long2BooleanOpenHashMap;
+import it.unimi.dsi.fastutil.longs.Long2ObjectOpenHashMap;
 import net.danygames2014.shineko.Shineko;
 import net.minecraft.block.Block;
 import net.minecraft.world.LightType;
@@ -64,36 +64,29 @@ public class LightUpdateMixin {
     private static final ThreadLocal<int[]> REMOVE_VAL_CACHE = ThreadLocal.withInitial(() -> new int[Shineko.CONFIG.lightUpdateQueueSize]);
 
     @Unique
-    private static final ThreadLocal<Long2BooleanOpenHashMap> VISITED_CHUNKS = ThreadLocal.withInitial(() -> new Long2BooleanOpenHashMap(512, 0.5f));
+    private static final ThreadLocal<Long2ObjectOpenHashMap<Chunk>> VISITED_CHUNKS = ThreadLocal.withInitial(() -> new Long2ObjectOpenHashMap<>(512, 0.5f));
     
     @Unique
     private int worldBottomY;
     
     @Unique
     private int worldTopY;
-    
+
     @Unique
-    public boolean isValidChunk(Long2BooleanOpenHashMap visitedChunks, World world, int chunkX, int chunkZ) {
+    public Chunk getChunk(Long2ObjectOpenHashMap<Chunk> visitedChunks, World world, int chunkX, int chunkZ) {
         long chunkKey = ((long) chunkX << 32) | (chunkZ & 0xFFFFFFFFL);
 
-        // Check if we already checked the validity of this chunk
-        boolean isChunkValid;
         if (visitedChunks.containsKey(chunkKey)) {
-            // Already checked
-            isChunkValid = visitedChunks.get(chunkKey);
-        } else {
-            // Not checked yet, check and cache the result
-            isChunkValid = world.chunkSource.isChunkLoaded(chunkX, chunkZ);
-            
-//            if (isChunkValid) {
-//                Chunk chunk = world.chunkSource.getChunk(chunkX, chunkZ);
-//                isChunkValid = chunk.terrainPopulated;
-//            }
-            
-            visitedChunks.put(chunkKey, isChunkValid);
+            return visitedChunks.get(chunkKey);
         }
-        
-        return isChunkValid;
+
+        Chunk chunk = null;
+        if (world.chunkSource.isChunkLoaded(chunkX, chunkZ)) {
+            chunk = world.chunkSource.getChunk(chunkX, chunkZ);
+        }
+
+        visitedChunks.put(chunkKey, chunk);
+        return chunk;
     }
     
     @Inject(method = "updateLight", at = @At(value = "HEAD"), cancellable = true)
@@ -118,7 +111,7 @@ public class LightUpdateMixin {
         int maxCapacity = queueX.length;
 
         // 1. Seed Stage
-        Long2BooleanOpenHashMap visitedChunks = VISITED_CHUNKS.get();
+        Long2ObjectOpenHashMap<Chunk> visitedChunks = VISITED_CHUNKS.get();
         visitedChunks.clear();
 
         for (int x = this.minX; x <= this.maxX; ++x) {
@@ -126,11 +119,11 @@ public class LightUpdateMixin {
             for (int z = this.minZ; z <= this.maxZ; ++z) {
                 int chunkZ = z >> 4;
 
-                // If the chunk is not valid, skip it
-                if (!isValidChunk(visitedChunks, world, chunkX, chunkZ)) {
+                Chunk chunk = getChunk(visitedChunks, world, chunkX, chunkZ);
+                if (chunk == null) {
                     continue;
                 }
-                
+
                 for (int y = this.minY; y <= this.maxY; ++y) {
                     int currentLight = world.getBrightness(this.lightType, x, y, z);
                     int targetLight = calculateTargetLight(world, visitedChunks, x, y, z);
@@ -144,9 +137,9 @@ public class LightUpdateMixin {
                                 removeVal[rTail] = currentLight;
                                 rTail++;
                             }
-                            world.setLight(this.lightType, x, y, z, 0);
+                            chunk.setLight(this.lightType, x & 15, y, z & 15, 0);
                         } else {
-                            world.setLight(this.lightType, x, y, z, targetLight);
+                            chunk.setLight(this.lightType, x & 15, y, z & 15, targetLight);
                             if (tail < maxCapacity) {
                                 queueX[tail] = x;
                                 queueY[tail] = y;
@@ -171,8 +164,10 @@ public class LightUpdateMixin {
                 int ny = cy + DY[i];
                 int nz = cz + DZ[i];
 
-                if (ny < worldBottomY || ny > worldTopY) continue;
-                if (!isValidChunk(visitedChunks, world, (nx >> 4), (nz >> 4))) continue;
+                if (ny < worldBottomY || ny >= worldTopY) continue;
+
+                Chunk chunk = getChunk(visitedChunks, world, nx >> 4, nz >> 4);
+                if (chunk == null) continue;
 
                 int neighborLight = world.getBrightness(this.lightType, nx, ny, nz);
                 int opacity = Block.BLOCKS_LIGHT_OPACITY[world.getBlockId(nx, ny, nz)];
@@ -186,7 +181,7 @@ public class LightUpdateMixin {
                         removeVal[rTail] = neighborLight;
                         rTail++;
                     }
-                    world.setLight(this.lightType, nx, ny, nz, 0);
+                    chunk.setLight(this.lightType, nx & 15, ny, nz & 15, 0);
                 } else if (neighborLight >= oldVal) {
                     if (tail < maxCapacity) {
                         queueX[tail] = nx;
@@ -212,15 +207,17 @@ public class LightUpdateMixin {
                 int ny = cy + DY[i];
                 int nz = cz + DZ[i];
 
-                if (ny < worldBottomY || ny > worldTopY) continue;
-                if (!isValidChunk(visitedChunks, world, (nx >> 4), (nz >> 4))) continue;
-                
+                if (ny < worldBottomY || ny >= worldTopY) continue;
+
+                Chunk chunk = getChunk(visitedChunks, world, nx >> 4, nz >> 4);
+                if (chunk == null) continue;
+
                 int neighborLight = world.getBrightness(this.lightType, nx, ny, nz);
                 int opacity = Block.BLOCKS_LIGHT_OPACITY[world.getBlockId(nx, ny, nz)];
                 if (opacity <= 0) opacity = 1;
 
                 if (neighborLight < currentLight - opacity) {
-                    world.setLight(this.lightType, nx, ny, nz, currentLight - opacity);
+                    chunk.setLight(this.lightType, nx & 15, ny, nz & 15, currentLight - opacity);
                     if (tail < maxCapacity) {
                         queueX[tail] = nx;
                         queueY[tail] = ny;
@@ -238,7 +235,7 @@ public class LightUpdateMixin {
     }
 
     @Unique
-    private int calculateTargetLight(World world, Long2BooleanOpenHashMap visitedChunks, int x, int y, int z) {
+    private int calculateTargetLight(World world, Long2ObjectOpenHashMap<Chunk> visitedChunks, int x, int y, int z) {
         int blockId = world.getBlockId(x, y, z);
         int opacity = Block.BLOCKS_LIGHT_OPACITY[blockId];
         if (opacity <= 0) opacity = 1;
@@ -261,7 +258,7 @@ public class LightUpdateMixin {
             if (ny < worldBottomY || ny >= worldTopY) continue;
 
             // Guard against doing lighting in chunks that are not valid
-            if (!isValidChunk(visitedChunks, world, nx >> 4, nz >> 4)) continue;
+            if (getChunk(visitedChunks, world, nx >> 4, nz >> 4) == null) continue;
 
             int neighborLight = world.getBrightness(this.lightType, nx, ny, nz);
             if (neighborLight > maxNeighbor) {
