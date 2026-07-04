@@ -65,14 +65,20 @@ public class LightUpdateMixin {
     @Unique
     private static final ThreadLocal<Long2BooleanOpenHashMap> VISITED_CHUNKS = ThreadLocal.withInitial(() -> new Long2BooleanOpenHashMap(512, 0.5f));
     
+    @Unique
+    private int worldBottomY;
+    
+    @Unique
+    private int worldTopY;
+    
     @Inject(method = "updateLight", at = @At(value = "HEAD"), cancellable = true)
     public void smileyFace(World world, CallbackInfo ci) {
         long startTime = System.nanoTime();
         
-        int bottomY = world.getBottomY();
-        int topY = world.getTopY();
-        if (this.minY < bottomY) this.minY = bottomY;
-        if (this.maxY >= topY) this.maxY = topY - 1;
+        worldBottomY = world.getBottomY();
+        worldTopY = world.getTopY();
+        if (this.minY < worldBottomY) this.minY = worldBottomY;
+        if (this.maxY >= worldTopY) this.maxY = worldTopY - 1;
 
         int pMinX = this.minX - 15;
         int pMaxX = this.maxX + 15;
@@ -157,7 +163,7 @@ public class LightUpdateMixin {
                 int ny = cy + DY[i];
                 int nz = cz + DZ[i];
 
-                if (nx < pMinX || nx > pMaxX || nz < pMinZ || nz > pMaxZ || ny < bottomY || ny > topY) continue;
+                if (nx < pMinX || nx > pMaxX || nz < pMinZ || nz > pMaxZ || ny < worldBottomY || ny > worldTopY) continue;
 
                 if (!world.hasChunk(nx >> 4, nz >> 4)) continue;
 
@@ -199,7 +205,7 @@ public class LightUpdateMixin {
                 int ny = cy + DY[i];
                 int nz = cz + DZ[i];
 
-                if (nx < pMinX || nx > pMaxX || nz < pMinZ || nz > pMaxZ || ny < bottomY || ny > topY) continue;
+                if (nx < pMinX || nx > pMaxX || nz < pMinZ || nz > pMaxZ || ny < worldBottomY || ny > worldTopY) continue;
 
                 if (!world.hasChunk(nx >> 4, nz >> 4)) continue;
                 
@@ -240,16 +246,13 @@ public class LightUpdateMixin {
         if (opacity >= 15 && baseLight == 0) return 0;
 
         int maxNeighbor = 0;
-        int bottomY = world.getBottomY();
-        int topY = world.getTopY();
-
         for (int i = 0; i < 6; i++) {
             int nx = x + DX[i];
             int ny = y + DY[i];
             int nz = z + DZ[i];
 
             // Guard against vertical world boundaries
-            if (ny < bottomY || ny >= topY) continue;
+            if (ny < worldBottomY || ny >= worldTopY) continue;
 
             // Guard against doing lighting in chunks that don't exist
             if (!world.hasChunk(nx >> 4, nz >> 4)) continue;
