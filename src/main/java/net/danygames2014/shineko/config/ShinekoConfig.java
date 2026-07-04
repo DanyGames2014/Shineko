@@ -10,5 +10,5 @@ public class ShinekoConfig {
     public Integer lightUpdateQueueSize = 65536;
     
     @ConfigEntry(name = "Light Thread Update Batch Size", minValue = 256, maxValue = 32768, requiresRestart = true)
-    public Integer lightThreadUpdateBatchSize = 8192;
+    public Integer lightThreadUpdateBatchSize = 4096;
 }
