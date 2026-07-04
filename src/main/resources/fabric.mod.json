@@ -20,6 +20,9 @@
     "stationapi:event_bus_client": [
     ],
     "stationapi:event_bus_server": [
+    ],
+    "gcapi3": [
+      "net.danygames2014.shineko.Shineko"
     ]
   },
   "accessWidener": "shineko.accesswidener",

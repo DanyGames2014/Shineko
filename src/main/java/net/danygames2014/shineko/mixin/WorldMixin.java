@@ -42,9 +42,6 @@ public abstract class WorldMixin implements ShinekoWorld {
     @Shadow
     private List lightingQueue;
 
-    @Shadow
-    public abstract void setLight(LightType lightType, int x, int y, int z, int value);
-
     // Keeping track of light updates
     @Unique
     LinkedTransferQueue<LightUpdate> lightUpdates = new LinkedTransferQueue<>();
@@ -59,8 +56,10 @@ public abstract class WorldMixin implements ShinekoWorld {
     
     @Inject(method = "<init>(Lnet/minecraft/world/storage/WorldStorage;Ljava/lang/String;JLnet/minecraft/world/dimension/Dimension;)V", at = @At("TAIL"))
     public void initLightThread(WorldStorage storage, String name, long seed, Dimension dimension, CallbackInfo ci) {
-        lightThread = new ShinekoLightThread("Shineko Light Thread (" + this.dimension.id + ")", (World) (Object) this);
-        lightThread.start();
+        if (Shineko.CONFIG.threadedLighting) {
+            lightThread = new ShinekoLightThread("Shineko Light Thread (" + this.dimension.id + ")", (World) (Object) this);
+            lightThread.start();
+        }
     }
     
     @Override
@@ -70,6 +69,10 @@ public abstract class WorldMixin implements ShinekoWorld {
 
     @Inject(method = "doLightingUpdates", at = @At(value = "HEAD"), cancellable = true)
     public void cancelVanillaLightUpdateProcessing(CallbackInfoReturnable<Boolean> cir) {
+        if (!Shineko.CONFIG.threadedLighting) {
+            return;
+        }
+        
         if (!this.lightingQueue.isEmpty()) {
             Shineko.LOGGER.warn("Lighting queue is not empty! This is a bug!");
         }
@@ -79,11 +82,19 @@ public abstract class WorldMixin implements ShinekoWorld {
 
     @Inject(method = "queueLightUpdate(Lnet/minecraft/world/LightType;IIIIIIZ)V", at = @At(value = "FIELD", target = "Lnet/minecraft/world/World;dimension:Lnet/minecraft/world/dimension/Dimension;", ordinal = 0, opcode = Opcodes.GETFIELD), cancellable = true)
     public void cancelVanillaLightUpdate(LightType type, int minX, int minY, int minZ, int maxX, int maxY, int maxZ, boolean allowMerge, CallbackInfo ci) {
+        if (!Shineko.CONFIG.threadedLighting) {
+            return;
+        }
+        
         ci.cancel();
     }
     
     @Inject(method = "queueLightUpdate(Lnet/minecraft/world/LightType;IIIIIIZ)V", at = @At("HEAD"))
     public void hijackLightUpdate(LightType type, int minX, int minY, int minZ, int maxX, int maxY, int maxZ, boolean allowMerge, CallbackInfo ci) {
+        if (!Shineko.CONFIG.threadedLighting) {
+            return;
+        }
+        
         if (this.dimension.hasCeiling && type == LightType.SKY) {
             return;
         }

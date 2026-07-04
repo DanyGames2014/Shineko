@@ -38,6 +38,13 @@ public class LightUpdateMixin {
     @Final
     public LightType lightType;
 
+    @Unique
+    private static final int[] DX = {-1, 1, 0, 0, 0, 0};
+    @Unique
+    private static final int[] DY = {0, 0, -1, 1, 0, 0};
+    @Unique
+    private static final int[] DZ = {0, 0, 0, 0, -1, 1};
+    
     @Unique 
     private static final ThreadLocal<int[]> QUEUE_X = ThreadLocal.withInitial(() -> new int[65536]);
     @Unique 
@@ -57,13 +64,6 @@ public class LightUpdateMixin {
 
     @Unique
     private final ThreadLocal<Long2BooleanOpenHashMap> VISITED_CHUNKS = ThreadLocal.withInitial(Long2BooleanOpenHashMap::new);
-    
-    @Unique
-    private static final int[] DX = {-1, 1, 0, 0, 0, 0};
-    @Unique
-    private static final int[] DY = {0, 0, -1, 1, 0, 0};
-    @Unique
-    private static final int[] DZ = {0, 0, 0, 0, -1, 1};
     
     @Inject(method = "updateLight", at = @At(value = "HEAD"), cancellable = true)
     public void smileyFace(World world, CallbackInfo ci) {
