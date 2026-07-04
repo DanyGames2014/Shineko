@@ -79,7 +79,6 @@ public abstract class WorldMixin implements ShinekoWorld {
     @Inject(method = "queueLightUpdate(Lnet/minecraft/world/LightType;IIIIIIZ)V", at = @At("HEAD"), cancellable = true)
     public void hijackLightUpdate(LightType type, int minX, int minY, int minZ, int maxX, int maxY, int maxZ, boolean allowMerge, CallbackInfo ci) {
         if (!Shineko.CONFIG.threadedLighting) {
-            ci.cancel();
             return;
         }
         
