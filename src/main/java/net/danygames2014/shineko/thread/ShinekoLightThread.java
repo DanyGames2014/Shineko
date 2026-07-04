@@ -21,6 +21,8 @@ public class ShinekoLightThread extends Thread {
         } else {
             this.queue = null;
         }
+        this.setDaemon(true);
+        this.setPriority(2);
     }
 
     @Override
@@ -47,15 +49,8 @@ public class ShinekoLightThread extends Thread {
         
         while (!this.isInterrupted()) {
             try {
-                // If the game is paused, wait a bit before checking the queue again
-                if (world.pauseTicking) {
-                    //noinspection BusyWait
-                    Thread.sleep(100);
-                    continue;
-                }
-
-                // Wait up to 500ms for a task. This prevents the thread from being stuck 
-                LightUpdate firstUpdate = this.queue.poll(500, TimeUnit.MILLISECONDS);
+                // Wait up to 100ms for a task. This prevents the thread from being stuck 
+                LightUpdate firstUpdate = this.queue.poll(100, TimeUnit.MILLISECONDS);
 
                 // If there's a task, update it and then process the queue'
                 if (firstUpdate != null) {

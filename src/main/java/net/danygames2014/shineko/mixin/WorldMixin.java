@@ -35,6 +35,9 @@ public abstract class WorldMixin implements ShinekoWorld {
     @Unique
     LinkedTransferQueue<LightUpdate> lightUpdates = new LinkedTransferQueue<>();
 
+    @Unique
+    LinkedTransferQueue<LightUpdate> lightUpdatesInternal = new LinkedTransferQueue<>();
+
     // Light Thread 
     @Unique
     ShinekoLightThread lightThread;
@@ -63,6 +66,9 @@ public abstract class WorldMixin implements ShinekoWorld {
             return;
         }
         
+        lightUpdatesInternal.drainTo(lightUpdates, Shineko.CONFIG.lightThreadUpdateBatchSize);
+        
+        // Check the vanilla lighting queue, which should be empty in this case
         if (!this.lightingQueue.isEmpty()) {
             Shineko.LOGGER.warn("Lighting queue is not empty! This is a bug!");
         }
@@ -82,11 +88,12 @@ public abstract class WorldMixin implements ShinekoWorld {
             return;
         }
 
-        this.lightUpdates.offer(new LightUpdate(type, minX, minY, minZ, maxX, maxY, maxZ));
-
-        if (this.lightUpdates.size() > 1000000) {
-            Shineko.LOGGER.warn("Over 1,000,000 updates pending! Clearing queue.");
-            this.lightUpdates.clear();
+        if (!this.lightUpdatesInternal.offer(new LightUpdate(type, minX, minY, minZ, maxX, maxY, maxZ))) {
+            Shineko.LOGGER.warn("Failed to queue light update! Queue is full!");
+            if (this.lightUpdatesInternal.size() > 1000000) {
+                Shineko.LOGGER.warn("Over 1,000,000 updates pending! Clearing queue.");
+                this.lightUpdatesInternal.clear();
+            }
         }
 
         ci.cancel();
