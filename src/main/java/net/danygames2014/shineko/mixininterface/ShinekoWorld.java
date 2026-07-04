@@ -7,6 +7,8 @@ import java.util.concurrent.LinkedTransferQueue;
 
 public interface ShinekoWorld {
     LinkedTransferQueue<LightUpdate> shineko$getLiqhtUpdateQueue();
+    
+    LinkedTransferQueue<Long> shineko$getVisitedChunks();
 
     ShinekoLightThread shineko$getLightThread();
 }

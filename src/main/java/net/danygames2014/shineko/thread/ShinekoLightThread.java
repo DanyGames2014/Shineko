@@ -1,9 +1,14 @@
 package net.danygames2014.shineko.thread;
 
+import it.unimi.dsi.fastutil.longs.LongOpenHashSet;
 import it.unimi.dsi.fastutil.objects.ObjectArrayList;
+import it.unimi.dsi.fastutil.objects.ObjectOpenHashSet;
 import net.danygames2014.shineko.Shineko;
+import net.danygames2014.shineko.mixininterface.ShinekoChunk;
+import net.danygames2014.shineko.mixininterface.ShinekoLightUpdate;
 import net.danygames2014.shineko.mixininterface.ShinekoWorld;
 import net.minecraft.world.World;
+import net.minecraft.world.chunk.Chunk;
 import net.minecraft.world.chunk.light.LightUpdate;
 
 import java.util.concurrent.LinkedTransferQueue;
@@ -11,14 +16,17 @@ import java.util.concurrent.TimeUnit;
 
 public class ShinekoLightThread extends Thread {
     private final World world;
+    private final ShinekoWorld shinekoWorld;
     private final LinkedTransferQueue<LightUpdate> queue;
 
     public ShinekoLightThread(String name, World world) {
         this.setName(name);
         this.world = world;
         if (world instanceof ShinekoWorld shinekoWorldO) {
+            this.shinekoWorld = shinekoWorldO;
             this.queue = shinekoWorldO.shineko$getLiqhtUpdateQueue();
         } else {
+            this.shinekoWorld = null;
             this.queue = null;
         }
         this.setDaemon(true);
@@ -47,6 +55,9 @@ public class ShinekoLightThread extends Thread {
         // Local array list reusable buffer to capture drained updates at high velocity
         ObjectArrayList<LightUpdate> batchBuffer = new ObjectArrayList<>(batchSize);
 
+        // A list of chunks which has been visited during light updates
+        LongOpenHashSet visitedChunks = new LongOpenHashSet(1024);
+
         while (!this.isInterrupted()) {
             try {
                 // Wait up to 100ms for a task. This prevents the thread from being stuck 
@@ -63,8 +74,23 @@ public class ShinekoLightThread extends Thread {
                     // Execute the light updates
                     for (LightUpdate update : batchBuffer) {
                         update.updateLight(this.world);
+                        
+                        // Retrieve the pre-packed bit keys directly from the LightUpdate mixin interface
+                        LongOpenHashSet packedKeys = ((ShinekoLightUpdate) update).shineko$getVisitedChunks();
+
+                        if (!packedKeys.isEmpty()) {
+                            visitedChunks.addAll(packedKeys);
+                        }
                     }
 
+                    if (!visitedChunks.isEmpty()) {
+                        java.util.concurrent.LinkedTransferQueue<Long> renderQueue = shinekoWorld.shineko$getVisitedChunks();
+                        for (long packedKey : visitedChunks) {
+                            renderQueue.offer(packedKey);
+                        }
+                    }
+                    visitedChunks.clear();
+                    
                     // Clear the tasks we have processed
                     batchBuffer.clear();
 

@@ -1,7 +1,9 @@
 package net.danygames2014.shineko.mixin;
 
 import it.unimi.dsi.fastutil.longs.Long2ObjectOpenHashMap;
+import it.unimi.dsi.fastutil.longs.LongOpenHashSet;
 import net.danygames2014.shineko.Shineko;
+import net.danygames2014.shineko.mixininterface.ShinekoLightUpdate;
 import net.minecraft.block.Block;
 import net.minecraft.world.LightType;
 import net.minecraft.world.World;
@@ -16,7 +18,7 @@ import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
 @Mixin(LightUpdate.class)
-public class LightUpdateMixin {
+public class LightUpdateMixin implements ShinekoLightUpdate {
     @Shadow
     public int minX;
 
@@ -67,11 +69,37 @@ public class LightUpdateMixin {
     private static final ThreadLocal<Long2ObjectOpenHashMap<Chunk>> VISITED_CHUNKS = ThreadLocal.withInitial(() -> new Long2ObjectOpenHashMap<>(512, 0.5f));
 
     @Unique
+    private static final ThreadLocal<LongOpenHashSet> VISITED_CHUNK_KEYS = ThreadLocal.withInitial(() -> new LongOpenHashSet(512, 0.5f));
+    
+    @Unique
     private int worldBottomY;
 
     @Unique
     private int worldTopY;
+    
+    @Unique
+    private boolean threaded;
 
+    @Override
+    public LongOpenHashSet shineko$getVisitedChunks() {
+        return VISITED_CHUNK_KEYS.get();
+    }
+
+    @Unique
+    private void setLight(Chunk chunk, LightType type, int x, int y, int z, int lightLevel) {
+        boolean wasDirty = chunk.dirty;
+        chunk.setLight(type, x & 15, y, z & 15, lightLevel);
+
+        if (threaded) {
+            long key = (((long) (x >> 4) & 0xFFFFFFL) << 40)
+                    | (((long) (z >> 4) & 0xFFFFFFL) << 16)
+                    | ((long) (y >> 4) & 0xFFFFL);
+            VISITED_CHUNK_KEYS.get().add(key);
+
+            chunk.dirty = wasDirty;
+        }
+    }
+    
     @Unique
     public Chunk getChunk(Long2ObjectOpenHashMap<Chunk> visitedChunks, World world, int chunkX, int chunkZ) {
         long chunkKey = ((long) chunkX << 32) | (chunkZ & 0xFFFFFFFFL);
@@ -93,6 +121,8 @@ public class LightUpdateMixin {
     public void smileyFace(World world, CallbackInfo ci) {
         long startTime = System.nanoTime();
 
+        threaded = Shineko.CONFIG.threadedLighting;
+        
         worldBottomY = world.getBottomY();
         worldTopY = world.getTopY();
         if (this.minY < worldBottomY) this.minY = worldBottomY;
@@ -115,6 +145,7 @@ public class LightUpdateMixin {
         // 1. Seed Stage
         Long2ObjectOpenHashMap<Chunk> visitedChunks = VISITED_CHUNKS.get();
         visitedChunks.clear();
+        VISITED_CHUNK_KEYS.get().clear();
 
         for (int x = this.minX; x <= this.maxX; ++x) {
             int chunkX = x >> 4;
@@ -139,9 +170,9 @@ public class LightUpdateMixin {
                                 removeVal[rTail] = currentLight;
                                 rTail++;
                             }
-                            chunk.setLight(this.lightType, x & 15, y, z & 15, 0);
+                            setLight(chunk, this.lightType, x, y, z, 0);
                         } else {
-                            chunk.setLight(this.lightType, x & 15, y, z & 15, targetLight);
+                            setLight(chunk, this.lightType, x, y, z, targetLight);
                             if (tail < maxCapacity) {
                                 queueX[tail] = x;
                                 queueY[tail] = y;
@@ -183,7 +214,7 @@ public class LightUpdateMixin {
                         removeVal[rTail] = neighborLight;
                         rTail++;
                     }
-                    chunk.setLight(this.lightType, nx & 15, ny, nz & 15, 0);
+                    setLight(chunk, this.lightType, nx, ny, nz, 0);
                 } else if (neighborLight >= oldVal) {
                     if (tail < maxCapacity) {
                         queueX[tail] = nx;
@@ -219,7 +250,7 @@ public class LightUpdateMixin {
                 if (opacity <= 0) opacity = 1;
 
                 if (neighborLight < currentLight - opacity) {
-                    chunk.setLight(this.lightType, nx & 15, ny, nz & 15, currentLight - opacity);
+                    setLight(chunk, this.lightType, nx, ny, nz, currentLight - opacity);
                     if (tail < maxCapacity) {
                         queueX[tail] = nx;
                         queueY[tail] = ny;

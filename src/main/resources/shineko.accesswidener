@@ -1,4 +1,6 @@
 classTweaker v2 named
 
+accessible field net/minecraft/client/Minecraft INSTANCE Lnet/minecraft/client/Minecraft;
+accessible field net/minecraft/client/render/WorldRenderer world Lnet/minecraft/world/World;
 accessible method net/minecraft/world/World hasChunk (II)Z
 accessible field net/minecraft/world/World chunkSource Lnet/minecraft/world/chunk/ChunkSource;
