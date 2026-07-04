@@ -165,7 +165,7 @@ public class LightUpdateMixin {
 
                 if (nx < pMinX || nx > pMaxX || nz < pMinZ || nz > pMaxZ || ny < worldBottomY || ny > worldTopY) continue;
 
-                if (!world.hasChunk(nx >> 4, nz >> 4)) continue;
+                if (!world.chunkSource.isChunkLoaded(nx >> 4, nz >> 4)) continue;
 
                 int neighborLight = world.getBrightness(this.lightType, nx, ny, nz);
                 int opacity = Block.BLOCKS_LIGHT_OPACITY[world.getBlockId(nx, ny, nz)];
@@ -207,7 +207,7 @@ public class LightUpdateMixin {
 
                 if (nx < pMinX || nx > pMaxX || nz < pMinZ || nz > pMaxZ || ny < worldBottomY || ny > worldTopY) continue;
 
-                if (!world.hasChunk(nx >> 4, nz >> 4)) continue;
+                if (!world.chunkSource.isChunkLoaded(nx >> 4, nz >> 4)) continue;
                 
                 int neighborLight = world.getBrightness(this.lightType, nx, ny, nz);
                 int opacity = Block.BLOCKS_LIGHT_OPACITY[world.getBlockId(nx, ny, nz)];
@@ -255,7 +255,7 @@ public class LightUpdateMixin {
             if (ny < worldBottomY || ny >= worldTopY) continue;
 
             // Guard against doing lighting in chunks that don't exist
-            if (!world.hasChunk(nx >> 4, nz >> 4)) continue;
+            if (!world.chunkSource.isChunkLoaded(nx >> 4, nz >> 4)) continue;
 
             int neighborLight = world.getBrightness(this.lightType, nx, ny, nz);
             if (neighborLight > maxNeighbor) {
