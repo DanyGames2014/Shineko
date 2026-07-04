@@ -29,7 +29,7 @@ public class ChunkMixin implements ShinekoChunk {
 //        if (this.world.dimension instanceof OverworldDimension) {
 //            return;
 //        }
-        
+
 //        int minBlockX = this.x << 4;
 //        int minBlockZ = this.z << 4;
 //        int maxBlockX = minBlockX + 15;

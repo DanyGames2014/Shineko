@@ -45,30 +45,30 @@ public class LightUpdateMixin {
     private static final int[] DY = {0, 0, -1, 1, 0, 0};
     @Unique
     private static final int[] DZ = {0, 0, 0, 0, -1, 1};
-    
-    @Unique 
+
+    @Unique
     private static final ThreadLocal<int[]> QUEUE_X = ThreadLocal.withInitial(() -> new int[Shineko.CONFIG.lightUpdateQueueSize]);
-    @Unique 
+    @Unique
     private static final ThreadLocal<int[]> QUEUE_Y = ThreadLocal.withInitial(() -> new int[Shineko.CONFIG.lightUpdateQueueSize]);
-    @Unique 
+    @Unique
     private static final ThreadLocal<int[]> QUEUE_Z = ThreadLocal.withInitial(() -> new int[Shineko.CONFIG.lightUpdateQueueSize]);
-    
-    @Unique 
+
+    @Unique
     private static final ThreadLocal<int[]> REMOVE_QUEUE_X = ThreadLocal.withInitial(() -> new int[Shineko.CONFIG.lightUpdateQueueSize]);
-    @Unique 
+    @Unique
     private static final ThreadLocal<int[]> REMOVE_QUEUE_Y = ThreadLocal.withInitial(() -> new int[Shineko.CONFIG.lightUpdateQueueSize]);
-    @Unique 
+    @Unique
     private static final ThreadLocal<int[]> REMOVE_QUEUE_Z = ThreadLocal.withInitial(() -> new int[Shineko.CONFIG.lightUpdateQueueSize]);
-    
+
     @Unique
     private static final ThreadLocal<int[]> REMOVE_VAL_CACHE = ThreadLocal.withInitial(() -> new int[Shineko.CONFIG.lightUpdateQueueSize]);
 
     @Unique
     private static final ThreadLocal<Long2ObjectOpenHashMap<Chunk>> VISITED_CHUNKS = ThreadLocal.withInitial(() -> new Long2ObjectOpenHashMap<>(512, 0.5f));
-    
+
     @Unique
     private int worldBottomY;
-    
+
     @Unique
     private int worldTopY;
 
@@ -88,11 +88,11 @@ public class LightUpdateMixin {
         visitedChunks.put(chunkKey, chunk);
         return chunk;
     }
-    
+
     @Inject(method = "updateLight", at = @At(value = "HEAD"), cancellable = true)
     public void smileyFace(World world, CallbackInfo ci) {
         long startTime = System.nanoTime();
-        
+
         worldBottomY = world.getBottomY();
         worldTopY = world.getTopY();
         if (this.minY < worldBottomY) this.minY = worldBottomY;
@@ -106,8 +106,10 @@ public class LightUpdateMixin {
         int[] removeZ = REMOVE_QUEUE_Z.get();
         int[] removeVal = REMOVE_VAL_CACHE.get();
 
-        int head = 0; int tail = 0;
-        int rHead = 0; int rTail = 0;
+        int head = 0;
+        int tail = 0;
+        int rHead = 0;
+        int rTail = 0;
         int maxCapacity = queueX.length;
 
         // 1. Seed Stage
@@ -230,7 +232,7 @@ public class LightUpdateMixin {
 
         long endTime = System.nanoTime();
         //System.out.println("Light update took " + (endTime - startTime) / 1000 + "us on thread " + Thread.currentThread().getName());
-        
+
         ci.cancel();
     }
 

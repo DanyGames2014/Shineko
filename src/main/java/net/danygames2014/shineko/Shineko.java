@@ -7,7 +7,7 @@ import org.apache.logging.log4j.Logger;
 
 public class Shineko {
     public static Logger LOGGER = LogManager.getLogger("Shineko");
-    
+
     @ConfigRoot(value = "general", visibleName = "Shineko Config")
     public static final ShinekoConfig CONFIG = new ShinekoConfig();
 }

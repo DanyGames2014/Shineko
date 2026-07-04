@@ -17,11 +17,11 @@ public class ChunkCacheMixin {
     @Inject(method = "loadChunk", at = @At(value = "TAIL"))
     public void populateLight(int chunkX, int chunkZ, CallbackInfoReturnable<Chunk> cir) {
         Chunk chunk = cir.getReturnValue();
-        
+
         if (chunk == this.empty) {
             return;
         }
 
-        ((ShinekoChunk)chunk).shineko$populateLight();
+        ((ShinekoChunk) chunk).shineko$populateLight();
     }
 }

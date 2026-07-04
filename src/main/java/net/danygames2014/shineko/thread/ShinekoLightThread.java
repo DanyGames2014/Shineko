@@ -12,7 +12,7 @@ import java.util.concurrent.TimeUnit;
 public class ShinekoLightThread extends Thread {
     private final World world;
     private final LinkedTransferQueue<LightUpdate> queue;
-    
+
     public ShinekoLightThread(String name, World world) {
         this.setName(name);
         this.world = world;
@@ -31,7 +31,7 @@ public class ShinekoLightThread extends Thread {
             Shineko.LOGGER.warn("World or queue is null! Thread " + this.getName() + " will not start.");
             return;
         }
-        
+
         super.start();
         Shineko.LOGGER.info("Started thread " + this.getName());
     }
@@ -43,10 +43,10 @@ public class ShinekoLightThread extends Thread {
         }
 
         int batchSize = Shineko.CONFIG.lightThreadUpdateBatchSize;
-        
+
         // Local array list reusable buffer to capture drained updates at high velocity
         ObjectArrayList<LightUpdate> batchBuffer = new ObjectArrayList<>(batchSize);
-        
+
         while (!this.isInterrupted()) {
             try {
                 // Wait up to 100ms for a task. This prevents the thread from being stuck 
@@ -56,15 +56,15 @@ public class ShinekoLightThread extends Thread {
                 if (firstUpdate != null) {
                     // Add the first update to the batch buffer
                     batchBuffer.add(firstUpdate);
-                    
+
                     // Draining the queue in batches is more efficient than polling repeatedly
                     this.queue.drainTo(batchBuffer, batchSize);
-                    
+
                     // Execute the light updates
                     for (LightUpdate update : batchBuffer) {
                         update.updateLight(this.world);
                     }
-                    
+
                     // Clear the tasks we have processed
                     batchBuffer.clear();
 

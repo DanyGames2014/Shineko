@@ -1,13 +1,12 @@
 package net.danygames2014.shineko.mixin;
 
 import net.danygames2014.shineko.Shineko;
-import net.danygames2014.shineko.thread.ShinekoLightThread;
 import net.danygames2014.shineko.mixininterface.ShinekoWorld;
+import net.danygames2014.shineko.thread.ShinekoLightThread;
 import net.minecraft.world.LightType;
 import net.minecraft.world.World;
 import net.minecraft.world.chunk.light.LightUpdate;
 import net.minecraft.world.dimension.Dimension;
-import net.minecraft.world.storage.WorldStorage;
 import org.spongepowered.asm.mixin.Final;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Shadow;
@@ -55,7 +54,7 @@ public abstract class WorldMixin implements ShinekoWorld {
             lightThread.start();
         }
     }
-    
+
     @Override
     public LinkedTransferQueue<LightUpdate> shineko$getLiqhtUpdateQueue() {
         return lightUpdates;
@@ -71,14 +70,14 @@ public abstract class WorldMixin implements ShinekoWorld {
         if (!Shineko.CONFIG.threadedLighting) {
             return;
         }
-        
+
         lightUpdatesInternal.drainTo(lightUpdates, Shineko.CONFIG.lightThreadUpdateBatchSize);
-        
+
         // Check the vanilla lighting queue, which should be empty in this case
         if (!this.lightingQueue.isEmpty()) {
             Shineko.LOGGER.warn("Lighting queue is not empty! This is a bug!");
         }
-        
+
         cir.setReturnValue(false);
     }
 
@@ -87,7 +86,7 @@ public abstract class WorldMixin implements ShinekoWorld {
         if (!Shineko.CONFIG.threadedLighting) {
             return;
         }
-        
+
         if (this.dimension.hasCeiling && type == LightType.SKY) {
             ci.cancel();
             return;
