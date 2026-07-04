@@ -10,6 +10,8 @@
   "server": [
   ],
   "client": [
+    "MinecraftMixin",
+    "WorldRendererMixin"
   ],
   "injectors": {
     "defaultRequire": 1
