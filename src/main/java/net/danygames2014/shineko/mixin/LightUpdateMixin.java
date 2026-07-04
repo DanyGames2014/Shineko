@@ -63,7 +63,7 @@ public class LightUpdateMixin {
     private static final ThreadLocal<int[]> REMOVE_VAL_CACHE = ThreadLocal.withInitial(() -> new int[Shineko.CONFIG.lightUpdateQueueSize]);
 
     @Unique
-    private final ThreadLocal<Long2BooleanOpenHashMap> VISITED_CHUNKS = ThreadLocal.withInitial(() -> new Long2BooleanOpenHashMap(512, 0.5f));
+    private static final ThreadLocal<Long2BooleanOpenHashMap> VISITED_CHUNKS = ThreadLocal.withInitial(() -> new Long2BooleanOpenHashMap(512, 0.5f));
     
     @Inject(method = "updateLight", at = @At(value = "HEAD"), cancellable = true)
     public void smileyFace(World world, CallbackInfo ci) {
