@@ -41,9 +41,15 @@ public abstract class WorldMixin implements ShinekoWorld {
     // Light Thread 
     @Unique
     ShinekoLightThread lightThread;
-    
-    @Inject(method = "<init>(Lnet/minecraft/world/storage/WorldStorage;Ljava/lang/String;JLnet/minecraft/world/dimension/Dimension;)V", at = @At("TAIL"))
-    public void initLightThread(WorldStorage storage, String name, long seed, Dimension dimension, CallbackInfo ci) {
+
+    @Inject(method = {
+            "<init>(Lnet/minecraft/world/storage/WorldStorage;Ljava/lang/String;JLnet/minecraft/world/dimension/Dimension;)V",
+            "<init>(Lnet/minecraft/world/storage/WorldStorage;Ljava/lang/String;Lnet/minecraft/world/dimension/Dimension;J)V",
+            "<init>(Lnet/minecraft/world/World;Lnet/minecraft/world/dimension/Dimension;)V"
+    },
+            at = @At("TAIL")
+    )
+    public void initLightThread(CallbackInfo ci) {
         if (Shineko.CONFIG.threadedLighting) {
             lightThread = new ShinekoLightThread("Shineko Light Thread (" + this.dimension.id + ") " + ZonedDateTime.now(), (World) (Object) this);
             lightThread.start();
