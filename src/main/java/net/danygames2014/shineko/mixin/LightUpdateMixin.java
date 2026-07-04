@@ -4,7 +4,6 @@ import it.unimi.dsi.fastutil.longs.Long2BooleanOpenHashMap;
 import net.minecraft.block.Block;
 import net.minecraft.world.LightType;
 import net.minecraft.world.World;
-import net.minecraft.world.chunk.Chunk;
 import net.minecraft.world.chunk.light.LightUpdate;
 import org.spongepowered.asm.mixin.Final;
 import org.spongepowered.asm.mixin.Mixin;
@@ -107,14 +106,8 @@ public class LightUpdateMixin {
                     // Already checked
                     isChunkValid = visitedChunks.get(chunkKey);
                 } else {
-                    // Not checked yet
-                    if (world.hasChunk(chunkX, chunkZ)) {
-                        Chunk chunk = world.getChunk(chunkX, chunkZ);
-                        isChunkValid = (chunk != null && !chunk.isEmpty());
-                    } else {
-                        isChunkValid = false;
-                    }
-                    
+                    // Not checked yet, check and cache the result
+                    isChunkValid = world.chunkSource.isChunkLoaded(chunkX, chunkZ);
                     visitedChunks.put(chunkKey, isChunkValid);
                 }
 
