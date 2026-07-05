@@ -2,13 +2,10 @@ package net.danygames2014.shineko.thread;
 
 import it.unimi.dsi.fastutil.longs.LongOpenHashSet;
 import it.unimi.dsi.fastutil.objects.ObjectArrayList;
-import it.unimi.dsi.fastutil.objects.ObjectOpenHashSet;
 import net.danygames2014.shineko.Shineko;
-import net.danygames2014.shineko.mixininterface.ShinekoChunk;
 import net.danygames2014.shineko.mixininterface.ShinekoLightUpdate;
 import net.danygames2014.shineko.mixininterface.ShinekoWorld;
 import net.minecraft.world.World;
-import net.minecraft.world.chunk.Chunk;
 import net.minecraft.world.chunk.light.LightUpdate;
 
 import java.util.concurrent.LinkedTransferQueue;
@@ -84,7 +81,7 @@ public class ShinekoLightThread extends Thread {
                     }
 
                     if (!visitedChunks.isEmpty()) {
-                        java.util.concurrent.LinkedTransferQueue<Long> renderQueue = shinekoWorld.shineko$getVisitedChunks();
+                        LinkedTransferQueue<Long> renderQueue = shinekoWorld.shineko$getVisitedChunks();
                         for (long packedKey : visitedChunks) {
                             renderQueue.offer(packedKey);
                         }

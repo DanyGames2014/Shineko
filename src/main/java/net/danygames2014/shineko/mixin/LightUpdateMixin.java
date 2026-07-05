@@ -4,6 +4,7 @@ import it.unimi.dsi.fastutil.longs.Long2ObjectOpenHashMap;
 import it.unimi.dsi.fastutil.longs.LongOpenHashSet;
 import net.danygames2014.shineko.Shineko;
 import net.danygames2014.shineko.mixininterface.ShinekoLightUpdate;
+import net.danygames2014.shineko.mixininterface.ShinekoWorld;
 import net.minecraft.block.Block;
 import net.minecraft.world.LightType;
 import net.minecraft.world.World;
@@ -17,57 +18,49 @@ import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
+import java.util.concurrent.LinkedTransferQueue;
+
 @Mixin(LightUpdate.class)
 public class LightUpdateMixin implements ShinekoLightUpdate {
     @Shadow
     public int minX;
-
     @Shadow
     public int maxX;
-
     @Shadow
     public int minY;
-
     @Shadow
     public int maxY;
-
     @Shadow
     public int minZ;
-
     @Shadow
     public int maxZ;
-
     @Shadow
     @Final
     public LightType lightType;
-
+    
     @Unique
     private static final int[] DX = {-1, 1, 0, 0, 0, 0};
     @Unique
     private static final int[] DY = {0, 0, -1, 1, 0, 0};
     @Unique
     private static final int[] DZ = {0, 0, 0, 0, -1, 1};
-
+    
     @Unique
     private static final ThreadLocal<int[]> QUEUE_X = ThreadLocal.withInitial(() -> new int[Shineko.CONFIG.lightUpdateQueueSize]);
     @Unique
     private static final ThreadLocal<int[]> QUEUE_Y = ThreadLocal.withInitial(() -> new int[Shineko.CONFIG.lightUpdateQueueSize]);
     @Unique
     private static final ThreadLocal<int[]> QUEUE_Z = ThreadLocal.withInitial(() -> new int[Shineko.CONFIG.lightUpdateQueueSize]);
-
     @Unique
     private static final ThreadLocal<int[]> REMOVE_QUEUE_X = ThreadLocal.withInitial(() -> new int[Shineko.CONFIG.lightUpdateQueueSize]);
     @Unique
     private static final ThreadLocal<int[]> REMOVE_QUEUE_Y = ThreadLocal.withInitial(() -> new int[Shineko.CONFIG.lightUpdateQueueSize]);
     @Unique
     private static final ThreadLocal<int[]> REMOVE_QUEUE_Z = ThreadLocal.withInitial(() -> new int[Shineko.CONFIG.lightUpdateQueueSize]);
-
     @Unique
     private static final ThreadLocal<int[]> REMOVE_VAL_CACHE = ThreadLocal.withInitial(() -> new int[Shineko.CONFIG.lightUpdateQueueSize]);
-
     @Unique
     private static final ThreadLocal<Long2ObjectOpenHashMap<Chunk>> VISITED_CHUNKS = ThreadLocal.withInitial(() -> new Long2ObjectOpenHashMap<>(512, 0.5f));
-
     @Unique
     private static final ThreadLocal<LongOpenHashSet> VISITED_CHUNK_KEYS = ThreadLocal.withInitial(() -> new LongOpenHashSet(512, 0.5f));
     
@@ -76,9 +69,6 @@ public class LightUpdateMixin implements ShinekoLightUpdate {
 
     @Unique
     private int worldTopY;
-    
-    @Unique
-    private boolean threaded;
 
     @Override
     public LongOpenHashSet shineko$getVisitedChunks() {
@@ -86,20 +76,49 @@ public class LightUpdateMixin implements ShinekoLightUpdate {
     }
 
     @Unique
-    private void setLight(Chunk chunk, LightType type, int x, int y, int z, int lightLevel) {
+    private void setLight(LongOpenHashSet visitedChunkKeys, Chunk chunk, LightType type, int x, int y, int z, int lightLevel) {
         boolean wasDirty = chunk.dirty;
         chunk.setLight(type, x & 15, y, z & 15, lightLevel);
 
-        if (threaded) {
-            long key = (((long) (x >> 4) & 0xFFFFFFL) << 40)
-                    | (((long) (z >> 4) & 0xFFFFFFL) << 16)
-                    | ((long) (y >> 4) & 0xFFFFL);
-            VISITED_CHUNK_KEYS.get().add(key);
+        int cx = x >> 4;
+        int cy = y >> 4;
+        int cz = z >> 4;
 
-            chunk.dirty = wasDirty;
+
+        long key = (((long) cx & 0xFFFFFFL) << 40)
+                | (((long) cz & 0xFFFFFFL) << 16)
+                | ((long) cy & 0xFFFFL);
+        visitedChunkKeys.add(key);
+
+        // Extract local position inside the 16x16x16 section
+        int lx = x & 15;
+        int ly = y & 15;
+        int lz = z & 15;
+
+        // 2. X-Axis Borders
+        if (lx == 0) {
+            visitedChunkKeys.add((((long) (cx - 1) & 0xFFFFFFL) << 40) | (((long) cz & 0xFFFFFFL) << 16) | ((long) cy & 0xFFFFL));
+        } else if (lx == 15) {
+            visitedChunkKeys.add((((long) (cx + 1) & 0xFFFFFFL) << 40) | (((long) cz & 0xFFFFFFL) << 16) | ((long) cy & 0xFFFFL));
         }
+
+        // 3. Y-Axis Borders (Fixes the dark floors/ceilings seen in obrazek.jpg)
+        if (ly == 0) {
+            visitedChunkKeys.add((((long) cx & 0xFFFFFFL) << 40) | (((long) cz & 0xFFFFFFL) << 16) | ((long) (cy - 1) & 0xFFFFL));
+        } else if (ly == 15) {
+            visitedChunkKeys.add((((long) cx & 0xFFFFFFL) << 40) | (((long) cz & 0xFFFFFFL) << 16) | ((long) (cy + 1) & 0xFFFFL));
+        }
+
+        // 4. Z-Axis Borders
+        if (lz == 0) {
+            visitedChunkKeys.add((((long) cx & 0xFFFFFFL) << 40) | (((long) (cz - 1) & 0xFFFFFFL) << 16) | ((long) cy & 0xFFFFL));
+        } else if (lz == 15) {
+            visitedChunkKeys.add((((long) cx & 0xFFFFFFL) << 40) | (((long) (cz + 1) & 0xFFFFFFL) << 16) | ((long) cy & 0xFFFFL));
+        }
+
+        chunk.dirty = wasDirty;
     }
-    
+
     @Unique
     public Chunk getChunk(Long2ObjectOpenHashMap<Chunk> visitedChunks, World world, int chunkX, int chunkZ) {
         long chunkKey = ((long) chunkX << 32) | (chunkZ & 0xFFFFFFFFL);
@@ -121,8 +140,8 @@ public class LightUpdateMixin implements ShinekoLightUpdate {
     public void smileyFace(World world, CallbackInfo ci) {
         long startTime = System.nanoTime();
 
-        threaded = Shineko.CONFIG.threadedLighting;
-        
+        boolean threaded = Shineko.CONFIG.threadedLighting;
+
         worldBottomY = world.getBottomY();
         worldTopY = world.getTopY();
         if (this.minY < worldBottomY) this.minY = worldBottomY;
@@ -145,7 +164,8 @@ public class LightUpdateMixin implements ShinekoLightUpdate {
         // 1. Seed Stage
         Long2ObjectOpenHashMap<Chunk> visitedChunks = VISITED_CHUNKS.get();
         visitedChunks.clear();
-        VISITED_CHUNK_KEYS.get().clear();
+        LongOpenHashSet visitedChunkKeys = VISITED_CHUNK_KEYS.get();
+        visitedChunkKeys.clear();
 
         for (int x = this.minX; x <= this.maxX; ++x) {
             int chunkX = x >> 4;
@@ -170,9 +190,9 @@ public class LightUpdateMixin implements ShinekoLightUpdate {
                                 removeVal[rTail] = currentLight;
                                 rTail++;
                             }
-                            setLight(chunk, this.lightType, x, y, z, 0);
+                            setLight(visitedChunkKeys, chunk, this.lightType, x, y, z, 0);
                         } else {
-                            setLight(chunk, this.lightType, x, y, z, targetLight);
+                            setLight(visitedChunkKeys, chunk, this.lightType, x, y, z, targetLight);
                             if (tail < maxCapacity) {
                                 queueX[tail] = x;
                                 queueY[tail] = y;
@@ -214,7 +234,7 @@ public class LightUpdateMixin implements ShinekoLightUpdate {
                         removeVal[rTail] = neighborLight;
                         rTail++;
                     }
-                    setLight(chunk, this.lightType, nx, ny, nz, 0);
+                    setLight(visitedChunkKeys, chunk, this.lightType, nx, ny, nz, 0);
                 } else if (neighborLight >= oldVal) {
                     if (tail < maxCapacity) {
                         queueX[tail] = nx;
@@ -250,13 +270,22 @@ public class LightUpdateMixin implements ShinekoLightUpdate {
                 if (opacity <= 0) opacity = 1;
 
                 if (neighborLight < currentLight - opacity) {
-                    setLight(chunk, this.lightType, nx, ny, nz, currentLight - opacity);
+                    setLight(visitedChunkKeys, chunk, this.lightType, nx, ny, nz, currentLight - opacity);
                     if (tail < maxCapacity) {
                         queueX[tail] = nx;
                         queueY[tail] = ny;
                         queueZ[tail] = nz;
                         tail++;
                     }
+                }
+            }
+        }
+
+        if (!threaded) {
+            if (!visitedChunks.isEmpty()) {
+                LinkedTransferQueue<Long> renderQueue = ((ShinekoWorld) world).shineko$getVisitedChunks();
+                for (long packedKey : visitedChunkKeys) {
+                    renderQueue.offer(packedKey);
                 }
             }
         }

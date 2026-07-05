@@ -75,10 +75,6 @@ public abstract class WorldMixin implements ShinekoWorld, StationFlatteningWorld
 
     @Inject(method = "doLightingUpdates", at = @At(value = "HEAD"), cancellable = true)
     public void cancelVanillaLightUpdateProcessing(CallbackInfoReturnable<Boolean> cir) {
-        if (!Shineko.CONFIG.threadedLighting) {
-            return;
-        }
-
         if (Minecraft.INSTANCE.worldRenderer != null && Minecraft.INSTANCE.worldRenderer.world != null && !visitedChunks.isEmpty()) {
             visitedChunks.drainTo(visitedChunksInternal);
 
@@ -96,8 +92,12 @@ public abstract class WorldMixin implements ShinekoWorld, StationFlatteningWorld
                         blockX, minBlockY + 15, blockZ
                 );
             }
-            
+
             visitedChunksInternal.clear();
+        }
+        
+        if (!Shineko.CONFIG.threadedLighting) {
+            return;
         }
 
         lightUpdatesInternal.drainTo(lightUpdates, Shineko.CONFIG.lightThreadUpdateBatchSize);
