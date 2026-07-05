@@ -9,6 +9,7 @@ import net.minecraft.world.LightType;
 import net.minecraft.world.World;
 import net.minecraft.world.chunk.light.LightUpdate;
 import net.minecraft.world.dimension.Dimension;
+import net.modificationstation.stationapi.api.util.SideUtil;
 import net.modificationstation.stationapi.api.world.StationFlatteningWorld;
 import org.spongepowered.asm.mixin.Final;
 import org.spongepowered.asm.mixin.Mixin;
@@ -75,26 +76,28 @@ public abstract class WorldMixin implements ShinekoWorld, StationFlatteningWorld
 
     @Inject(method = "doLightingUpdates", at = @At(value = "HEAD"), cancellable = true)
     public void cancelVanillaLightUpdateProcessing(CallbackInfoReturnable<Boolean> cir) {
-        if (Minecraft.INSTANCE.worldRenderer != null && Minecraft.INSTANCE.worldRenderer.world != null && !visitedChunks.isEmpty()) {
-            visitedChunks.drainTo(visitedChunksInternal);
+        SideUtil.run(() -> {
+            if (Minecraft.INSTANCE.worldRenderer != null && Minecraft.INSTANCE.worldRenderer.world != null && !visitedChunks.isEmpty()) {
+                visitedChunks.drainTo(visitedChunksInternal);
 
-            for (long key : visitedChunksInternal) {
-                int chunkX = (int) (key >> 40);
-                int chunkZ = (int) ((key << 24) >> 40);
-                int sectionY = (int) ((key << 48) >> 48);
+                for (long key : visitedChunksInternal) {
+                    int chunkX = (int) (key >> 40);
+                    int chunkZ = (int) ((key << 24) >> 40);
+                    int sectionY = (int) ((key << 48) >> 48);
 
-                int blockX = chunkX << 4;
-                int blockZ = chunkZ << 4;
-                int minBlockY = sectionY << 4;
+                    int blockX = chunkX << 4;
+                    int blockZ = chunkZ << 4;
+                    int minBlockY = sectionY << 4;
 
-                Minecraft.INSTANCE.worldRenderer.markDirty(
-                        blockX, minBlockY, blockZ,
-                        blockX, minBlockY + 15, blockZ
-                );
+                    Minecraft.INSTANCE.worldRenderer.markDirty(
+                            blockX, minBlockY, blockZ,
+                            blockX, minBlockY + 15, blockZ
+                    );
+                }
+
+                visitedChunksInternal.clear();
             }
-
-            visitedChunksInternal.clear();
-        }
+        }, () -> {});
         
         if (!Shineko.CONFIG.threadedLighting) {
             return;
