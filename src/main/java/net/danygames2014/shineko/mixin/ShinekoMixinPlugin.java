@@ -32,10 +32,10 @@ public class ShinekoMixinPlugin implements IMixinConfigPlugin {
 
     @Override
     public List<String> getMixins() {
-        if (!FabricLoader.getInstance().isModLoaded("smoothbeta") && !FabricLoader.getInstance().isModLoaded("amphetamine") && !FabricLoader.getInstance().isModLoaded("nitch")) {
-            Shineko.LOGGER.info("SmoothBeta or its derivates not installed, optimizing ChunkCache");
-            return List.of("optimization.ChunkCacheMixin");
-        }
+//        if (!FabricLoader.getInstance().isModLoaded("smoothbeta") && !FabricLoader.getInstance().isModLoaded("amphetamine") && !FabricLoader.getInstance().isModLoaded("nitch")) {
+//            Shineko.LOGGER.info("SmoothBeta or its derivates not installed, optimizing ChunkCache");
+//            return List.of("optimization.ChunkCacheMixin");
+//        }
 
         return null;
     }

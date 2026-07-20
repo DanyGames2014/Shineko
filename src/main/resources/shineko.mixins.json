@@ -8,7 +8,8 @@
     "ChunkCacheMixin",
     "ChunkMixin",
     "LightUpdateMixin",
-    "WorldMixin"
+    "WorldMixin",
+    "optimization.ChunkCacheMixin"
   ],
   "server": [
   ],
