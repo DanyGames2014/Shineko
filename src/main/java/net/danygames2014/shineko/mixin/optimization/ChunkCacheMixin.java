@@ -1,4 +1,4 @@
-package net.danygames2014.shineko.mixin.test;
+package net.danygames2014.shineko.mixin.optimization;
 
 import it.unimi.dsi.fastutil.ints.Int2ObjectMap;
 import it.unimi.dsi.fastutil.ints.Int2ObjectOpenHashMap;
