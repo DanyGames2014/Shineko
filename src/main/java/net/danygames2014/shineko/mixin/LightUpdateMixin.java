@@ -102,7 +102,7 @@ public class LightUpdateMixin implements ShinekoLightUpdate {
             visitedChunkKeys.add((((long) (cx + 1) & 0xFFFFFFL) << 40) | (((long) cz & 0xFFFFFFL) << 16) | ((long) cy & 0xFFFFL));
         }
 
-        // 3. Y-Axis Borders (Fixes the dark floors/ceilings seen in obrazek.jpg)
+        // 3. Y-Axis Borders
         if (ly == 0) {
             visitedChunkKeys.add((((long) cx & 0xFFFFFFL) << 40) | (((long) cz & 0xFFFFFFL) << 16) | ((long) (cy - 1) & 0xFFFFL));
         } else if (ly == 15) {
@@ -138,8 +138,6 @@ public class LightUpdateMixin implements ShinekoLightUpdate {
 
     @Inject(method = "updateLight", at = @At(value = "HEAD"), cancellable = true)
     public void smileyFace(World world, CallbackInfo ci) {
-        long startTime = System.nanoTime();
-
         boolean threaded = Shineko.CONFIG.threadedLighting;
 
         worldBottomY = world.getBottomY();
@@ -289,9 +287,6 @@ public class LightUpdateMixin implements ShinekoLightUpdate {
                 }
             }
         }
-
-        long endTime = System.nanoTime();
-        //System.out.println("Light update took " + (endTime - startTime) / 1000 + "us on thread " + Thread.currentThread().getName());
 
         ci.cancel();
     }
