@@ -1,2 +1,1 @@
-* Add mod icon
-* Fix crash on server
+* Fix improper lighting under trees
