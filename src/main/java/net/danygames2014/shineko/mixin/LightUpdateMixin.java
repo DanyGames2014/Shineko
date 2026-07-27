@@ -37,14 +37,14 @@ public class LightUpdateMixin implements ShinekoLightUpdate {
     @Shadow
     @Final
     public LightType lightType;
-    
+
     @Unique
     private static final int[] DX = {-1, 1, 0, 0, 0, 0};
     @Unique
     private static final int[] DY = {0, 0, -1, 1, 0, 0};
     @Unique
     private static final int[] DZ = {0, 0, 0, 0, -1, 1};
-    
+
     @Unique
     private static final ThreadLocal<int[]> QUEUE_X = ThreadLocal.withInitial(() -> new int[Shineko.CONFIG.lightUpdateQueueSize]);
     @Unique
@@ -63,7 +63,7 @@ public class LightUpdateMixin implements ShinekoLightUpdate {
     private static final ThreadLocal<Long2ObjectOpenHashMap<Chunk>> VISITED_CHUNKS = ThreadLocal.withInitial(() -> new Long2ObjectOpenHashMap<>(512, 0.5f));
     @Unique
     private static final ThreadLocal<LongOpenHashSet> VISITED_CHUNK_KEYS = ThreadLocal.withInitial(() -> new LongOpenHashSet(512, 0.5f));
-    
+
     @Unique
     private int worldBottomY;
 
@@ -297,8 +297,11 @@ public class LightUpdateMixin implements ShinekoLightUpdate {
         int opacity = Block.BLOCKS_LIGHT_OPACITY[blockId];
         if (opacity <= 0) opacity = 1;
 
+        Chunk chunk = getChunk(visitedChunks, world, x >> 4, z >> 4);
+        if (chunk == null) return 0;
+
         int baseLight = switch (this.lightType) {
-            case SKY -> world.isTopY(x, y, z) ? 15 : 0;
+            case SKY -> (y >= chunk.getHeight(x & 15, z & 15)) ? 15 : 0;
             case BLOCK -> Block.BLOCKS_LIGHT_LUMINANCE[blockId];
         };
 
@@ -318,11 +321,11 @@ public class LightUpdateMixin implements ShinekoLightUpdate {
             if (getChunk(visitedChunks, world, nx >> 4, nz >> 4) == null) continue;
 
             int neighborLight = world.getBrightness(this.lightType, nx, ny, nz);
-            if (neighborLight > maxNeighbor) {
-                maxNeighbor = neighborLight;
+            if (neighborLight - opacity > maxNeighbor) {
+                maxNeighbor = neighborLight - opacity;
             }
         }
 
-        return Math.max(baseLight, Math.max(0, maxNeighbor - opacity));
+        return Math.max(baseLight, maxNeighbor);
     }
 }
